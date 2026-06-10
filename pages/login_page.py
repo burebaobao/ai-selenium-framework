@@ -1,8 +1,14 @@
 """
 pages/login_page.py
 
-目标网站登录页 Page Object
-https://user.hxapp.vip/pc/#/login
+⚠️ Demo：框架验证用的参考实现，与你实际要测的网站无关。
+
+这是演示框架能力的参考例子，展示了:
+  - AIElement 语义定位用法
+  - CaptchaSolver 验证码处理集成
+  - API 方式 / UI 方式两种登录策略
+
+适配你自己的网站，直接参考这个结构创建 pages/your_page.py 即可。
 """
 
 import json

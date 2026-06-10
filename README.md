@@ -122,24 +122,25 @@ pip install -r requirements.txt
 #### 6. 验证安装
 
 ```powershell
-# 激活虚拟环境后执行
+# 使用框架自带的 AI 发现模式验证
 cd ai-selenium-framework
 .venv\Scripts\activate
-pytest tests/test_login.py::TestLogin::test_login_page_loads -v --headless
+python scripts/run_nl_test.py --discover "https://www.baidu.com" "搜索输入框,百度一下按钮"
 ```
 
-看到 `PASSED` 表示全部就绪。
+看到 AI 返回元素定位结果表示全部就绪。
 
 </details>
 
-### 第一个测试
+### 第一个测试（不需要验证码）
 
 ```bash
-# 运行冒烟测试（页面加载验证，不需要验证码）
-pytest tests/test_login.py::TestLogin::test_login_page_loads -v --headless
-```
+# 使用 AI 发现模式：打开任意页面，让 AI 分析元素
+python scripts/run_nl_test.py --discover "https://www.baidu.com" "搜索输入框,搜索按钮"
 
-看到 `PASSED` 表示环境跑通了。
+# 或直接跑自带的 demo 页面加载验证
+pytest tests/ -v --headless -k "test_login_page_loads"
+```
 
 ---
 
@@ -421,68 +422,39 @@ pytest tests/ --no-ai-heal
 
 ---
 
-## 登录测试说明
+## 📖 Demo：登录测试参考
 
-本框架内置了一个目标网站的登录测试作为参考案例。
+> **⚠️ 以下为框架验证用的 Demo，与你实际要测的网站无关。**  
+> 核心框架本身**不绑定任何网站**，适配自己的网站见 [FAQ 中的方法](#q-如何适配自己的网站)。
 
-### 测试用例
+`tests/test_login.py` + `pages/login_page.py` 是框架能力的参考实现，演示了：
 
-| 用例 | 描述 | 需要验证码 |
-|------|------|-----------|
-| `test_login_page_loads` | 页面加载和元素可见性验证 | ❌ |
-| `test_login_form_fields` | 表单输入功能验证 | ❌ |
-| `test_login_via_api` | 通过 API 登录 | ✅ |
-| `test_login_with_manual_captcha` | 通过 UI 点击登录 | ✅ |
+- 页面加载验证（`test_login_page_loads`）
+- 表单操作测试（`test_login_form_fields`）
+- API 方式登录（`test_login_via_api`）
+- UI 点击登录（`test_login_with_manual_captcha`）
 
-### 验证码处理流程
-
-该网站使用图形验证码，框架支持三种处理策略：
+### 验证码处理策略（框架通用能力）
 
 ```
-环境变量 CAPTCHA_TEXT  →  直接使用（适合 CI/预设）
+环境变量 CAPTCHA_TEXT  →  直接使用（适合 CI / 预设）
         ↓ 不设置
 Tesseract OCR 识别     →  自动尝试
         ↓ 识别失败
-人工查看并输入         →  保存图片提示用户
+人工查看并输入         →  保存图片，提示用户
 ```
 
-### 带验证码的运行方式
-
-**方式一：手动获取 + 注入（推荐）**
+### 运行 Demo
 
 ```bash
-# 步骤 1: 获取验证码图片
-python scripts/get_captcha.py
+# 不需要验证码的两个测试
+pytest tests/test_login.py -k "test_login_page_loads or test_login_form_fields" -v --headless
 
-# 输出类似:
-#   验证码图片: /path/to/reports/captcha/captcha.png
-#   Captcha ID: xxxxxx
-
-# 步骤 2: 打开图片查看验证码文字
-open reports/captcha/captcha.png          # macOS
-# start reports/captcha/captcha.png       # Windows
-# xdg-open reports/captcha/captcha.png    # Linux
-
-# 步骤 3: 用环境变量传入验证码，运行测试
+# 需要验证码时，注入环境变量
 # macOS / Linux:
-CAPTCHA_TEXT='<看到的文字>' CAPTCHA_ID='<输出的ID>' pytest tests/test_login.py -k "login_via_api"
+CAPTCHA_TEXT='xxx' CAPTCHA_ID='xxx' pytest tests/test_login.py -k "login_via_api" -v --headless
 # Windows PowerShell:
-# $env:CAPTCHA_TEXT='<看到的文字>'; $env:CAPTCHA_ID='<输出的ID>'; pytest tests/test_login.py -k "login_via_api"
-```
-
-**方式二：直接通过程序运行（一次性）**
-
-```python
-from pages.login_page import LoginPage
-
-page = LoginPage(driver)
-# 调用 login_via_api 时传参
-page.login_via_api(
-    email="your@email.com",
-    password="your_password",
-    captcha_text="看到的验证码",    # 直接传入
-    captcha_id="获取到的ID",
-)
+# $env:CAPTCHA_TEXT='xxx'; $env:CAPTCHA_ID='xxx'; pytest tests/test_login.py -k "login_via_api" -v --headless
 ```
 
 ---
