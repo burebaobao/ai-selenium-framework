@@ -28,6 +28,8 @@ anthropic>=0.30,<1.0
 # 工具
 python-dotenv>=1.0,<2.0
 loguru>=0.7,<1.0
+colorama>=0.4,<1.0           # Windows 彩色终端输出
+Pillow>=10.0,<12.0           # 图片处理（验证码 OCR）
 
 # 类型检查
 typing-extensions>=4.10,<5.0

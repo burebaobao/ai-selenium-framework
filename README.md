@@ -11,6 +11,7 @@
 - [核心特性](#核心特性)
 - [项目结构](#项目结构)
 - [运行测试](#运行测试)
+- [🗣️ 自然语言测试](#️-自然语言测试)
 - [AI 元素定位](#ai-元素定位)
 - [登录测试说明](#登录测试说明)
 - [配置说明](#配置说明)
@@ -29,6 +30,8 @@
 
 ### 安装
 
+#### macOS / Linux
+
 ```bash
 # 克隆项目
 git clone https://gitee.com/burebaobao/ai-selenium-framework.git
@@ -36,11 +39,98 @@ cd ai-selenium-framework
 
 # 创建虚拟环境
 python3 -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 
 # 安装依赖
 pip install -r requirements.txt
 ```
+
+#### Windows
+
+```powershell
+# 克隆项目
+git clone https://gitee.com/burebaobao/ai-selenium-framework.git
+cd ai-selenium-framework
+
+# 创建虚拟环境
+python -m venv .venv
+
+# 激活虚拟环境
+.venv\Scripts\activate
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+> ⚠️ **Windows 注意**：使用 `python` 而不是 `python3`，路径分隔符用 `\`。
+
+### Windows 环境准备（详细）
+
+<details>
+<summary>点击展开 Windows 完整安装步骤</summary>
+
+#### 1. 安装 Python
+
+- 从 [python.org](https://www.python.org/downloads/) 下载 Python >= 3.10
+- **安装时勾选 "Add Python to PATH"**
+- 安装后验证：
+  ```powershell
+  python --version
+  pip --version
+  ```
+
+#### 2. 安装浏览器
+
+- **Chrome**：[google.cn/chrome](https://www.google.cn/chrome/)
+- 浏览器驱动由 `webdriver-manager` 自动管理，无需手动下载
+
+#### 3. 安装 Git
+
+- 从 [git-scm.com](https://git-scm.com/download/win) 下载安装
+- 使用默认选项即可
+
+#### 4. （可选）安装 Tesseract OCR
+
+用于验证码自动识别。不安装不影响框架运行，只是验证码需要手动输入。
+
+- 下载安装包：[GitHub UB-Mannheim/tesseract](https://github.com/UB-Mannheim/tesseract/wiki)
+- 选择 **64位** 版本（如 `tesseract-ocr-w64-setup-5.x.x.exe`）
+- 安装时勾选 **简体中文** 语言包
+- 安装后添加到 PATH：
+  ```powershell
+  # 查看安装路径（默认）
+  dir "C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+  # 手动添加到 PATH（以管理员身份运行 PowerShell）
+  [Environment]::SetEnvironmentVariable(
+      "Path",
+      [Environment]::GetEnvironmentVariable("Path", "Machine") + ";C:\Program Files\Tesseract-OCR",
+      "Machine"
+  )
+
+  # 验证
+  tesseract --version
+  ```
+
+#### 5. 安装 Visual C++ 运行时
+
+某些 Python 包需要 VC++ 运行时，如果 `pip install` 报错 `Microsoft Visual C++ 14.0 is required`：
+
+- 下载 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+- 安装时选择 **"使用 C++ 的桌面开发"** 工作负载
+
+#### 6. 验证安装
+
+```powershell
+# 激活虚拟环境后执行
+cd ai-selenium-framework
+.venv\Scripts\activate
+pytest tests/test_login.py::TestLogin::test_login_page_loads -v --headless
+```
+
+看到 `PASSED` 表示全部就绪。
+
+</details>
 
 ### 第一个测试
 
@@ -194,9 +284,82 @@ pytest tests/ -m "not manual_captcha"  # 跳过手动验证码测试
 ### 生成报告
 
 ```bash
-pip install allure-pytest
-pytest tests/ --alluredir=reports/allure-results
+# 安装 Allure（macOS）
+brew install allure
+
+# Windows: 从 https://github.com/allure-framework/allure2/releases 下载
+# 解压后添加到 PATH，然后：
 allure serve reports/allure-results
+```
+
+---
+
+## 🗣️ 自然语言测试
+
+用一句话描述操作，框架自动生成并执行测试。
+
+### 一键执行
+
+```bash
+# macOS / Linux
+python scripts/run_nl_test.py "打开 https://example.com，点击登录按钮，等待2秒，截图" --headless
+
+# Windows PowerShell
+python scripts/run_nl_test.py "打开 https://example.com，点击登录按钮，等待2秒，截图" --headless
+```
+
+支持的描述模式：
+
+```
+打开 https://...            → 导航到页面
+在搜索框输入 AI测试          → 在元素中输入文本
+点击登录按钮                 → 点击元素
+等待3秒                      → 等待指定秒数
+截图                         → 保存页面截图
+验证标题包含 首页            → 断言页面标题
+验证结果包含 成功            → 断言元素文本
+悬停到菜单                   → 悬停到元素
+滚动到底部                   → 滚动到元素
+```
+
+### 发现模式：AI 分析页面元素
+
+```bash
+# 告诉框架要找哪些元素，AI 自动分析页面并返回定位策略
+# macOS / Linux
+python scripts/run_nl_test.py --discover "https://example.com/login" "登录按钮,用户名输入框,密码输入框"
+
+# Windows
+python scripts/run_nl_test.py --discover "https://example.com/login" "登录按钮,用户名输入框,密码输入框"
+```
+
+输出示例：
+```
+🔍 正在打开: https://example.com/login
+🎯 目标元素: 登录按钮, 用户名输入框, 密码输入框
+
+  ✅ [登录按钮]
+     定位方式: css_selector
+     定位值:   .login-btn
+     置信度:   92%
+```
+
+### 运行已生成的测试
+
+```bash
+python scripts/run_nl_test.py --run tests/ai_generated/
+```
+
+### 带验证码的登录测试
+
+```bash
+# 1. 获取验证码图片
+python scripts/get_captcha.py
+
+# 2. 注入验证码（Windows PowerShell 语法）
+$env:CAPTCHA_TEXT='看到的验证码'
+$env:CAPTCHA_ID='获取到的ID'
+python scripts/run_nl_test.py "打开 https://user.hxapp.vip/pc/#/login，在邮箱输入框输入 your@email.com，在密码输入框输入 your_password，在验证码输入框输入，点击登录按钮" --headless
 ```
 
 ---
@@ -296,10 +459,15 @@ python scripts/get_captcha.py
 #   Captcha ID: xxxxxx
 
 # 步骤 2: 打开图片查看验证码文字
-open reports/captcha/captcha.png
+open reports/captcha/captcha.png          # macOS
+# start reports/captcha/captcha.png       # Windows
+# xdg-open reports/captcha/captcha.png    # Linux
 
 # 步骤 3: 用环境变量传入验证码，运行测试
+# macOS / Linux:
 CAPTCHA_TEXT='<看到的文字>' CAPTCHA_ID='<输出的ID>' pytest tests/test_login.py -k "login_via_api"
+# Windows PowerShell:
+# $env:CAPTCHA_TEXT='<看到的文字>'; $env:CAPTCHA_ID='<输出的ID>'; pytest tests/test_login.py -k "login_via_api"
 ```
 
 **方式二：直接通过程序运行（一次性）**
@@ -390,6 +558,38 @@ docker run ai-selenium-framework
 ### Q: 没有 AI API Key 能用吗？
 
 可以。框架默认使用 mock 模式返回模拟定位结果。AI 定位功能需要配 API Key 才生效，但框架的基础功能（传统定位、自愈流程、测试执行）不依赖 AI。
+
+### Q: Windows 和 macOS/Linux 命令有什么区别？
+
+| 操作 | macOS / Linux | Windows |
+|------|--------------|---------|
+| Python 命令 | `python3` | `python` |
+| 虚拟环境创建 | `python3 -m venv .venv` | `python -m venv .venv` |
+| 激活虚拟环境 | `source .venv/bin/activate` | `.venv\Scripts\activate` |
+| 设置环境变量 | `export KEY=val` | `$env:KEY='val'` (PowerShell) |
+
+### Q: Windows 上 `pip install` 报错 `Microsoft Visual C++ 14.0 is required`？
+
+某些 Python 包需要 C++ 编译环境。解决方法：
+
+1. 下载 [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+2. 安装时勾选 **"使用 C++ 的桌面开发"**
+3. 或安装 [VC++ 可再发行组件包](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+
+### Q: Windows 上虚拟环境激活报错 `execution policy`？
+
+```powershell
+# 以管理员身份运行 PowerShell 后执行
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+.venv\Scripts\activate
+```
+
+### Q: Windows 上如何运行自然语言测试？
+
+```powershell
+# 注意用 python 而不是 python3，环境变量用 $env:
+$env:AI_PROVIDER='claude'; python scripts/run_nl_test.py "打开百度，搜索AI测试，验证标题包含 AI" --headless
+```
 
 ### Q: 验证码总是识别失败怎么办？
 
