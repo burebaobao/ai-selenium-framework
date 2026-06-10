@@ -114,11 +114,21 @@ class LLMClient:
     def _mock_response(self, prompt: str) -> str:
         """
         模拟响应（用于无 API Key 时的开发调试）
-        返回一个合理的默认定位结果
+        根据 prompt 内容自动判断返回格式（步骤列表 / 定位结果）
         """
+        import json
+
+        # 判断 prompt 类型
+        if "解析为结构化的步骤" in prompt or "测试描述" in prompt:
+            # 返回步骤列表格式
+            return json.dumps([
+                {"action": "open", "element_desc": "", "value": "https://example.com", "description": "打开页面"},
+                {"action": "click", "element_desc": "按钮", "value": "", "description": "点击按钮"},
+            ], ensure_ascii=False)
+
+        # 默认：元素定位结果
         import re
         import uuid
-
         found_match = re.search(r'"([^"]+)"', prompt.split("元素语义描述")[-1] if "元素语义描述" in prompt else "")
         element = found_match.group(1) if found_match else "未知元素"
 

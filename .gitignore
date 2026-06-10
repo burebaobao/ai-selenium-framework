@@ -16,7 +16,11 @@ env/
 *.swo
 *~
 
-# 报告
+# AI 生成的测试脚本（保留目录结构）
+pages/ai_generated/*.py
+!pages/ai_generated/__init__.py
+tests/ai_generated/*.py
+!tests/ai_generated/__init__.py
 reports/screenshots/*
 reports/allure-results/*
 reports/allure-report/*

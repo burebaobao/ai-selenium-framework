@@ -100,6 +100,151 @@ class AIElementLocator:
         return result
 
     # ---------------------------------------------------------------
+    # 交互式发现：给定 URL + 元素描述，自动定位
+    # ---------------------------------------------------------------
+
+    def discover_element(
+        self,
+        driver,
+        url: str,
+        element_desc: str,
+        timeout: int = 15,
+    ) -> LocatorResult:
+        """
+        在页面上交互式发现元素
+
+        打开页面 → AI 分析 HTML → 返回定位器 → 验证
+
+        Args:
+            driver: Selenium WebDriver
+            url: 目标页面 URL
+            element_desc: 元素描述（"登录按钮"、"搜索框"）
+            timeout: 超时秒数
+
+        Returns:
+            LocatorResult 包含已验证的定位器
+        """
+        import asyncio
+        import time
+
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+
+        logger.info(f"[发现] 🎯 {element_desc} @ {url}")
+        driver.get(url)
+
+        # 等待页面渲染
+        try:
+            WebDriverWait(driver, timeout).until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
+            )
+        except Exception:
+            pass
+
+        # 额外的 SPA 渲染等待
+        time.sleep(3)
+
+        page_source = driver.page_source
+        current_url = driver.current_url
+
+        result = asyncio.run(
+            self.locate(
+                page_source=page_source,
+                element_desc=element_desc,
+                url=current_url,
+                use_cache=False,
+            )
+        )
+
+        if result.found:
+            # 验证定位器是否有效
+            by_map = {
+                "css_selector": By.CSS_SELECTOR,
+                "xpath": By.XPATH,
+                "text": By.XPATH,
+                "aria_label": By.CSS_SELECTOR,
+                "id": By.ID,
+                "name": By.NAME,
+            }
+            by = by_map.get(result.locator_type, By.CSS_SELECTOR)
+            value = result.locator_value
+
+            try:
+                el = WebDriverWait(driver, 3).until(
+                    EC.presence_of_element_located((by, value))
+                )
+                logger.info(
+                    f"[发现] ✓ 定位成功: {by}={value} "
+                    f'(文本: "{el.text[:30]}", '
+                    f"标签: <{el.tag_name}>)"
+                )
+            except Exception as e:
+                logger.warning(f"[发现] ⚠ 定位器验证失败: {e}")
+                result.found = False
+                result.reasoning = f"AI 推荐定位器验证失败: {e}"
+
+        return result
+
+    def discover_multiple(
+        self,
+        driver,
+        url: str,
+        elements: list[tuple[str, str]],
+        timeout: int = 15,
+    ) -> dict[str, LocatorResult]:
+        """
+        一次发现多个元素
+
+        Args:
+            driver: Selenium WebDriver
+            url: 目标页面 URL
+            elements: [(描述1, 别名1), (描述2, 别名2), ...]
+            timeout: 超时秒数
+
+        Returns:
+            {别名: LocatorResult, ...}
+        """
+        import asyncio
+        import time
+
+        from selenium.webdriver.support.ui import WebDriverWait
+
+        logger.info(f"[发现] 🎯 批量发现 {len(elements)} 个元素 @ {url}")
+        driver.get(url)
+
+        try:
+            WebDriverWait(driver, timeout).until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
+            )
+        except Exception:
+            pass
+
+        time.sleep(3)
+
+        page_source = driver.page_source
+        current_url = driver.current_url
+
+        results = {}
+        for desc, alias in elements:
+            result = asyncio.run(
+                self.locate(
+                    page_source=page_source,
+                    element_desc=desc,
+                    url=current_url,
+                    use_cache=False,
+                )
+            )
+            results[alias] = result
+            status = "✓" if result.found else "✗"
+            logger.info(
+                f"[发现] {status} {alias} ({desc}): "
+                f"{result.locator_type}={result.locator_value}"
+            )
+
+        return results
+
+    # ---------------------------------------------------------------
     # HTML 清洗
     # ---------------------------------------------------------------
 

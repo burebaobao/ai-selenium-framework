@@ -154,24 +154,38 @@ def auto_heal(driver, heal_engine):
     在 NoSuchElementException 时自动触发 AI 自愈。
     """
     original_find = driver.find_element
+    _retry_count = 0
+    _max_retries = 3
 
     def healing_find(by, value):
+        nonlocal _retry_count
         try:
             return original_find(by, value)
-        except Exception as e:
-            if heal_engine.enabled:
-                new_value = heal_engine.heal(
-                    driver=driver,
-                    by=by,
-                    old_value=value,
-                    page_source=driver.page_source,
-                )
-                if new_value:
-                    try:
-                        return original_find(by, new_value)
-                    except Exception:
-                        pass
-            raise e
+        except Exception:
+            if not heal_engine.enabled:
+                raise
+
+            _retry_count += 1
+            if _retry_count > _max_retries:
+                logger.warning(f"[自愈] 全局已达上限 ({_max_retries}次), 放弃自愈")
+                raise
+
+            new_value = heal_engine.heal(
+                driver=driver,
+                by=by,
+                old_value=value,
+                page_source=driver.page_source,
+            )
+            if new_value:
+                try:
+                    return original_find(by, new_value)
+                except Exception:
+                    _retry_count += 1
+                    if _retry_count > _max_retries:
+                        raise
+                    # 再试一次
+                    return original_find(by, new_value)
+            raise
 
     driver.find_element = healing_find
     yield
