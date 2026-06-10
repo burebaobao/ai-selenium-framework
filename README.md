@@ -12,6 +12,7 @@
 - [项目结构](#项目结构)
 - [运行测试](#运行测试)
 - [🗣️ 自然语言测试](#️-自然语言测试)
+- [🧪 完整上手指南：以百度搜索为例](#-完整上手指南以百度搜索为例)
 - [AI 元素定位](#ai-元素定位)
 - [登录测试说明](#登录测试说明)
 - [配置说明](#配置说明)
@@ -351,17 +352,166 @@ python scripts/run_nl_test.py --discover "https://example.com/login" "登录按�
 python scripts/run_nl_test.py --run tests/ai_generated/
 ```
 
-### 带验证码的登录测试
+---
+
+## 🧪 完整上手指南：以百度搜索为例
+
+从零开始，一步步演示如何用自然语言完成一个完整的 Web 自动化测试。
+
+### 第 1 步：发现元素
+
+先让 AI 去百度首页看一看，找到我们要操作的页面元素：
 
 ```bash
-# 1. 获取验证码图片
-python scripts/get_captcha.py
-
-# 2. 注入验证码（Windows PowerShell 语法）
-$env:CAPTCHA_TEXT='看到的验证码'
-$env:CAPTCHA_ID='获取到的ID'
-python scripts/run_nl_test.py "打开 https://user.hxapp.vip/pc/#/login，在邮箱输入框输入 your@email.com，在密码输入框输入 your_password，在验证码输入框输入，点击登录按钮" --headless
+python scripts/run_nl_test.py --discover "https://www.baidu.com" "搜索输入框,百度一下按钮"
 ```
+
+输出：
+
+```
+🔍 正在打开: https://www.baidu.com
+🎯 目标元素: 搜索输入框, 百度一下按钮
+
+  ✅ [搜索输入框]
+     定位方式: css_selector
+     定位值:   #kw
+     置信度:   92%
+     说明:     通过 id='kw' 定位搜索输入框
+
+  ✅ [百度一下按钮]
+     定位方式: css_selector
+     定位值:   #su
+     置信度:   90%
+     说明:     通过 id='su' 定位搜索按钮
+```
+
+> AI 帮你找到了：搜索框是 `#kw`，搜索按钮是 `#su`。
+
+### 第 2 步：配环境变量（可选）
+
+```bash
+# macOS / Linux
+export AI_PROVIDER=claude
+
+# Windows PowerShell
+# $env:AI_PROVIDER='claude'
+```
+
+不配也行，框架用 mock 模式也能运行（定位器为模拟结果，不影响流程演示）。
+
+### 第 3 步：一句话执行测试
+
+```bash
+python scripts/run_nl_test.py "打开 https://www.baidu.com，在搜索输入框输入 AI测试，点击百度一下按钮，等待3秒，验证标题包含 AI测试" --headless
+```
+
+执行过程：
+
+```
+📝 自然语言描述: 打开 https://www.baidu.com，在搜索输入框输入 AI测试，点击百度一下按钮，等待3秒，验证标题包含 AI测试
+
+📄 生成测试文件: tests/ai_generated/test_baidu.py
+📋 解析步骤 (4 步):
+  🌐 步骤1: 打开https://www.baidu.com
+  ⌨️ 步骤2: 在搜索输入框输入AI测试
+  👆 步骤3: 点击百度一下按钮
+  ⏳ 步骤4: 等待3秒
+  ✅ 步骤5: 标题包含AI测试
+
+▶️  正在执行测试...
+
+tests/ai_generated/test_baidu.py ✓ PASSED [100%]
+
+✅ 测试全部通过！
+```
+
+整个过程：**描述 → 生成 → 执行 → 报告**，一行命令完成。
+
+### 第 4 步：查看生成的代码
+
+框架执行完后，会自动保留生成的测试文件，供后续复用或修改：
+
+```bash
+# 查看生成的 Page Object
+cat pages/ai_generated/baidu.py
+
+# 查看生成的测试代码
+cat tests/ai_generated/test_baidu.py
+```
+
+**生成的 Page Object** (`pages/ai_generated/baidu.py`)：
+
+```python
+"""
+Page Object: BaiduPage
+AI 自动生成
+"""
+
+from pages.base_page import BasePage
+
+
+class BaiduPage(BasePage):
+    """百度搜索页面"""
+
+    url = "https://www.baidu.com"
+
+    @property
+    def 搜索输入框(self):
+        return self.element("搜索输入框")
+
+    @property
+    def 百度一下按钮(self):
+        return self.element("百度一下按钮")
+```
+
+**生成的测试代码** (`tests/ai_generated/test_baidu.py`)：
+
+```python
+"""
+Test: 打开https://www.baidu.com -> 在搜索输入框输入AI测试 -> 点击百度一下按钮 -> 等待3秒 -> 标题包含AI测试
+Generated: 2026-06-10 22:30:00
+Framework: AI + Selenium
+"""
+
+import pytest
+from pages.ai_generated.baidu import BaiduPage
+
+
+class TestBaiduPage:
+    """AI 生成的自动化测试"""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, request, driver):
+        self.driver = driver
+        self.baidu_page = BaiduPage(driver)
+        yield
+
+    @pytest.mark.ai_generated
+    def test_打开百度搜索AI测试(self):
+        """打开https://www.baidu.com -> 在搜索输入框输入AI测试 -> 点击百度一下按钮 -> 等待3秒 -> 验证标题包含AI测试"""
+        self.baidu_page.open("https://www.baidu.com")
+        self.baidu_page.wait_for_page_loaded()
+        self.baidu_page.搜索输入框.input("AI测试")
+        self.baidu_page.百度一下按钮.click()
+        import time; time.sleep(3)
+        assert "AI测试" in self.driver.title
+```
+
+### 第 5 步：复用和定制
+
+生成后的测试文件可以直接用 pytest 反复运行，不再需要 AI：
+
+```bash
+# 直接运行已生成的测试
+pytest tests/ai_generated/test_baidu.py -v --headless
+
+# 或批量运行所有 AI 生成的测试
+pytest tests/ai_generated/ -v --headless
+
+# 修改测试后再次运行（改动会保留）
+```
+
+也可以在生成代码的基础上手动调整，比如增加更多断言、参数化测试数据等。
 
 ---
 
