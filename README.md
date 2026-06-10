@@ -1,0 +1,448 @@
+# AI + Selenium Web 自动化测试框架
+
+> **智能定位 · 自愈修复 · 自然语言驱动**  
+> 用 AI 大语言模型驱动元素定位，Selenium 作为执行引擎，pytest 作为测试框架。
+
+---
+
+## 目录
+
+- [快速开始](#快速开始)
+- [核心特性](#核心特性)
+- [项目结构](#项目结构)
+- [运行测试](#运行测试)
+- [AI 元素定位](#ai-元素定位)
+- [登录测试说明](#登录测试说明)
+- [配置说明](#配置说明)
+- [CI/CD](#cicd)
+- [FAQ](#faq)
+
+---
+
+## 快速开始
+
+### 环境要求
+
+- Python >= 3.10
+- Chrome / Firefox / Edge 浏览器
+- （可选）Tesseract OCR —— 用于验证码自动识别
+
+### 安装
+
+```bash
+# 克隆项目
+git clone https://gitee.com/burebaobao/ai-selenium-framework.git
+cd ai-selenium-framework
+
+# 创建虚拟环境
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+### 第一个测试
+
+```bash
+# 运行冒烟测试（页面加载验证，不需要验证码）
+pytest tests/test_login.py::TestLogin::test_login_page_loads -v --headless
+```
+
+看到 `PASSED` 表示环境跑通了。
+
+---
+
+## 核心特性
+
+### 🤖 AI 元素定位
+
+传统 `find_element` 失败时，AI 引擎自动接管：
+
+```
+定位失败 (NoSuchElementException)
+        ↓
+AI 分析页面 HTML + 语义描述
+        ↓
+生成最佳定位策略 (CSS/XPath/文本/aria)
+        ↓
+验证定位器有效性
+        ↓
+自动修复 or 标记待审核
+```
+
+**代码示例：**
+
+```python
+# 传统方式（定位器写死）
+login_btn = driver.find_element(By.ID, "login-btn")
+
+# AI 方式（语义描述 + 传统定位回退）
+self.element("登录按钮", locator=(By.ID, "login-btn")).click()
+# → 如果 #login-btn 找不到，AI 自动分析页面找到真正的登录按钮
+```
+
+### 🔧 自愈引擎
+
+页面 UI 改版后，定位器断掉也能自动修复：
+
+| 场景 | 传统框架 | 本框架 |
+|------|---------|--------|
+| ID 变更 | ❌ 用例挂了 | ✅ AI 找到新 ID |
+| 类名修改 | ❌ 手动改代码 | ✅ 自动修复 + 记录 |
+| DOM 重构 | ❌ 从头查元素 | ✅ 语义定位 |
+| 前端升级 | ❌ 大批量维护 | ✅ 渐进适应 |
+
+### 📝 自然语言生成
+
+（预留能力）描述操作即可生成测试脚本：
+
+```yaml
+# test_cases.yaml
+- case: "打开登录页，输入账号密码，点击登录，验证跳转到首页"
+```
+
+---
+
+## 项目结构
+
+```
+ai-selenium-framework/
+│
+├── core/                        # 核心引擎
+│   ├── ai_locator.py            #   AI 元素定位器
+│   ├── heal_engine.py           #   自愈引擎
+│   ├── driver_factory.py        #   多浏览器驱动工厂
+│   └── captcha_solver.py        #   验证码识别器
+│
+├── pages/                       # Page Object 页面对象
+│   ├── base_page.py             #   AI 增强基类
+│   └── login_page.py            #   登录页对象
+│
+├── tests/                       # 测试用例
+│   ├── conftest.py              #   pytest 全局配置
+│   └── test_login.py            #   登录功能测试
+│
+├── utils/                       # 工具类
+│   ├── ai_client.py             #   LLM 客户端
+│   └── logger.py                #   日志
+│
+├── config/                      # 配置
+│   ├── settings.py              #   配置管理
+│   └── config.yaml              #   全局配置
+│
+├── element_repository/          # 自愈元素仓库
+│   ├── elements.yaml            #   元素定位器
+│   └── healing_log.jsonl        #   自愈日志
+│
+├── scripts/
+│   └── get_captcha.py           #   验证码获取脚本
+│
+├── reports/                     # 报告输出
+│   ├── screenshots/             #   失败截图
+│   ├── captcha/                 #   验证码图片
+│   └── allure-results/          #   Allure 数据
+│
+└── requirements.txt             # 依赖清单
+```
+
+---
+
+## 运行测试
+
+### 全部测试
+
+```bash
+pytest tests/
+```
+
+### 指定浏览器
+
+```bash
+pytest tests/ --browser chrome     # Chrome（默认）
+pytest tests/ --browser firefox    # Firefox
+pytest tests/ --browser edge       # Edge
+```
+
+### 无头模式
+
+```bash
+pytest tests/ --headless
+```
+
+### 并发执行
+
+```bash
+pip install pytest-xdist
+pytest tests/ -n 4                # 4 个线程并行
+```
+
+### 失败重试
+
+```bash
+pip install pytest-rerunfailures
+pytest tests/ --reruns 2 --reruns-delay 3
+```
+
+### 标签过滤
+
+```bash
+pytest tests/ -m smoke              # 只跑冒烟测试
+pytest tests/ -m "not manual_captcha"  # 跳过手动验证码测试
+```
+
+### 生成报告
+
+```bash
+pip install allure-pytest
+pytest tests/ --alluredir=reports/allure-results
+allure serve reports/allure-results
+```
+
+---
+
+## AI 元素定位
+
+### 基本用法
+
+项目使用 `AIElement` 类包装元素，定位策略按优先级降级：
+
+```python
+from pages.base_page import BasePage
+
+class MyPage(BasePage):
+    @property
+    def search_input(self):
+        # 优先级 1: 传统定位（ID/class 等稳定属性）
+        # 优先级 2: AI 语义定位（分析 HTML 自动查找）
+        return self.element(
+            "搜索输入框",                    # 语义描述
+            locator=(By.ID, "search-input")  # 可选的传统定位
+        )
+
+    @property
+    def search_button(self):
+        return self.element("搜索按钮")
+```
+
+### 配置 AI 提供商
+
+在 `.env` 文件中配置：
+
+```bash
+# Claude（推荐）
+AI_PROVIDER=claude
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxx
+
+# 或者 OpenAI
+# AI_PROVIDER=openai
+# OPENAI_API_KEY=sk-xxxxxxxxxxxx
+
+# 或者本地模型（Ollama）
+# AI_PROVIDER=local
+# LOCAL_MODEL_URL=http://localhost:11434/v1
+# LOCAL_MODEL_NAME=qwen2.5:7b
+```
+
+> **注意**：不配置 API Key 也能运行，框架会使用模拟响应（mock 模式），适合开发调试。
+
+### 自愈控制
+
+```bash
+# 启用自愈（默认开启）
+pytest tests/ --ai-heal
+
+# 禁用自愈
+pytest tests/ --no-ai-heal
+```
+
+---
+
+## 登录测试说明
+
+本框架内置了一个目标网站的登录测试作为参考案例。
+
+### 测试用例
+
+| 用例 | 描述 | 需要验证码 |
+|------|------|-----------|
+| `test_login_page_loads` | 页面加载和元素可见性验证 | ❌ |
+| `test_login_form_fields` | 表单输入功能验证 | ❌ |
+| `test_login_via_api` | 通过 API 登录 | ✅ |
+| `test_login_with_manual_captcha` | 通过 UI 点击登录 | ✅ |
+
+### 验证码处理流程
+
+该网站使用图形验证码，框架支持三种处理策略：
+
+```
+环境变量 CAPTCHA_TEXT  →  直接使用（适合 CI/预设）
+        ↓ 不设置
+Tesseract OCR 识别     →  自动尝试
+        ↓ 识别失败
+人工查看并输入         →  保存图片提示用户
+```
+
+### 带验证码的运行方式
+
+**方式一：手动获取 + 注入（推荐）**
+
+```bash
+# 步骤 1: 获取验证码图片
+python scripts/get_captcha.py
+
+# 输出类似:
+#   验证码图片: /path/to/reports/captcha/captcha.png
+#   Captcha ID: xxxxxx
+
+# 步骤 2: 打开图片查看验证码文字
+open reports/captcha/captcha.png
+
+# 步骤 3: 用环境变量传入验证码，运行测试
+CAPTCHA_TEXT='<看到的文字>' CAPTCHA_ID='<输出的ID>' pytest tests/test_login.py -k "login_via_api"
+```
+
+**方式二：直接通过程序运行（一次性）**
+
+```python
+from pages.login_page import LoginPage
+
+page = LoginPage(driver)
+# 调用 login_via_api 时传参
+page.login_via_api(
+    email="your@email.com",
+    password="your_password",
+    captcha_text="看到的验证码",    # 直接传入
+    captcha_id="获取到的ID",
+)
+```
+
+---
+
+## 配置说明
+
+### 命令行参数
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--browser` | 浏览器类型 | `chrome` |
+| `--headless` | 无头模式 | `false` |
+| `--ai-heal` | 启用 AI 自愈 | `true` |
+| `--no-ai-heal` | 禁用 AI 自愈 | — |
+| `--ai-provider` | AI 供应商 | `claude` |
+
+### 环境变量
+
+| 变量 | 说明 |
+|------|------|
+| `ANTHROPIC_API_KEY` | Claude API Key |
+| `OPENAI_API_KEY` | OpenAI API Key |
+| `AI_PROVIDER` | AI 供应商选择 |
+| `BROWSER` | 默认浏览器 |
+| `HEADLESS` | 是否无头模式 |
+| `CAPTCHA_TEXT` | 预置验证码文字 |
+| `CAPTCHA_ID` | 预置验证码 ID |
+
+### 自愈阈值
+
+在 `core/heal_engine.py` 中调整：
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `auto_approve_threshold` | 0.85 | 置信度 ≥ 85% 自动采纳新定位器 |
+| `max_retries` | 2 | 自愈最大重试次数 |
+
+---
+
+## CI/CD
+
+### GitHub Actions
+
+```yaml
+name: UI Tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: pytest tests/ --headless --browser chrome
+```
+
+### Docker
+
+```bash
+# 构建
+docker build -t ai-selenium-framework -f docker/Dockerfile .
+
+# 运行
+docker run ai-selenium-framework
+```
+
+---
+
+## FAQ
+
+### Q: 没有 AI API Key 能用吗？
+
+可以。框架默认使用 mock 模式返回模拟定位结果。AI 定位功能需要配 API Key 才生效，但框架的基础功能（传统定位、自愈流程、测试执行）不依赖 AI。
+
+### Q: 验证码总是识别失败怎么办？
+
+该网站的验证码抗 OCR 能力较强。建议的使用方式：
+1. 运行 `python scripts/get_captcha.py` 获取验证码图片
+2. 人工查看图片中的文字
+3. 用 `CAPTCHA_TEXT` 环境变量注入
+
+### Q: 如何适配自己的网站？
+
+以登录页为例：
+
+```python
+# pages/my_page.py
+from pages.base_page import BasePage
+from selenium.webdriver.common.by import By
+
+class MyLoginPage(BasePage):
+    url = "https://your-site.com/login"
+
+    @property
+    def username(self):
+        return self.element("用户名输入框", locator=(By.ID, "username"))
+
+    @property
+    def password(self):
+        return self.element("密码输入框", locator=(By.ID, "password"))
+
+    @property
+    def login_btn(self):
+        return self.element("登录按钮", locator=(By.CSS_SELECTOR, ".login-btn"))
+```
+
+然后创建对应的测试文件即可。
+
+### Q: 自愈记录在哪看？
+
+自愈日志保存在 `element_repository/healing_log.jsonl`，每次自愈都会记录：
+
+```json
+{
+  "timestamp": "2026-06-10T21:00:00",
+  "old_by": "id",
+  "old_value": "login-btn",
+  "new_type": "css_selector",
+  "new_value": ".header-login-button",
+  "confidence": 0.95,
+  "reasoning": "ID 从 login-btn 变更为动态 ID，使用 class 定位更稳定"
+}
+```
+
+---
+
+## 许可证
+
+MIT
