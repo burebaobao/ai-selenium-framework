@@ -1,0 +1,37 @@
+# ============================================================
+# config/config.yaml
+# AI-Selenium 全局配置
+# ============================================================
+
+ai:
+  provider: claude          # claude | openai | local
+  model: claude-sonnet-4-20250514
+  auto_approve_threshold: 0.85
+  cache_enabled: true
+  max_html_length: 8000
+
+driver:
+  default_browser: chrome   # chrome | firefox | edge
+  headless: false
+  implicit_wait: 5
+  page_load_timeout: 30
+  script_timeout: 10
+  window_width: 1920
+  window_height: 1080
+
+heal:
+  enabled: true
+  element_repo_path: element_repository/elements.yaml
+  healing_log_path: element_repository/healing_log.jsonl
+  max_retries: 2
+  retry_delay: 1.0
+
+report:
+  screenshot_dir: reports/screenshots
+  allure_dir: reports/allure-results
+  html_report: reports/report.html
+
+logging:
+  level: INFO
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+  file: logs/framework.log
