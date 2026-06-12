@@ -1,74 +1,53 @@
-
 ```mermaid
 flowchart TD
-    Start([用户请求元素<br/>GetElement()]) --> Check{是否有显式<br/>定位器？<br/><small>CSS/XPath/ID</small>}
+    Start(["用户请求元素<br/>GetElement()"])
 
-    %% 显式定位器路径
-    Check --"有" --> TryLocate[尝试传统定位<br/><small>driver.find_element</small>]
-    TryLocate --> Result{定位成功?}
-    Result --"✓ 是" --> Cache[缓存 WebElement]
-    Cache --> Return([返回元素])
+    Start --> Check{是否有显式<br/>定位器?}
 
-    Result --"✗ 否" --> AIStart[进入 AI 定位流程]
+    Check -->|"有"| Try["尝试传统定位<br/>driver.find_element()"]
+    Check -->|"无"| AIStart["直接进入<br/>AI定位流程"]
 
-    %% 无显式定位器直接走 AI
-    Check --"否" --> AIStart
+    Try --> Result{定位<br/>成功?}
 
-    %% AI 定位流程子图
-    subgraph AI_FLOW ["🤖 AI 元素定位流程"]
-        direction TB
-        A1[1. 获取当前页面 HTML<br/><small>移除 script/style<br/>精简属性</small>] --> A2[2. 构建 Prompt<br/><small>元素描述 + 上下文</small>]
-        A2 --> A3[3. 发送给 LLM<br/><small>Claude / GPT / 本地</small>]
-        A3 --> A4[4. 解析返回结果<br/><small>{locator_type, value,<br/>confidence, reasoning}</small>]
-        A4 --> A5{置信度 ≥ 阈值?<br/><small>默认 0.85</small>}
-        A5 --"✓ 是" --> A6[缓存新定位器]
-        A6 --> A7[写入元素仓库<br/><small>elements.yaml</small>]
-        A7 --> A8[使用新定位器重试 find_element]
-        A8 --> A9{重试成功?}
-        A9 --"✓ 是" --> Cache
+    Result -->|"✓ 是"| Cache["缓存WebElement<br/>返回给调用方"]
 
-        A5 --"✗ 否" --> A10[记录到 healing_log<br/><small>标记待人工审核</small>]
-        A10 --> A11[返回 fallback 策略<br/>或抛出 ElementNotFound]
-        A9 --"✗ 否" --> A10
-    end
+    Result -->|"✗ 否"| AIStart
 
-    AIStart --> A1
-    A11 --> Error([失败<br/>抛出异常])
+    AIStart --> A1["1. 获取页面HTML<br/>清理后发送"]
 
-    %% 样式
-    classDef startEnd fill:#00d4ff,stroke:#000,stroke-width:2px,color:#000,font-weight:bold,rx:10,ry:10
-    classDef decision fill:#ffce5c,stroke:#000,stroke-width:2px,color:#000,rx:8,ry:8
-    classDef process fill:#e8e8e8,stroke:#333,stroke-width:1.5px,color:#000
-    classDef success fill:#80e27e,stroke:#000,stroke-width:2px,color:#000,font-weight:bold
-    classDef error fill:#ff6b6b,stroke:#000,stroke-width:2px,color:#000,font-weight:bold
-    classDef aiBox fill:#f0f0ff,stroke:#6b6bff,stroke-width:2px,color:#000,stroke-dasharray:5,5
-    classDef cache fill:#ffd7a8,stroke:#000,stroke-width:1.5px,color:#000
+    A1 --> A2["2. 构建Prompt<br/>元素描述+页面结构"]
+    A2 --> A3["3. 发送给LLM<br/>Claude/GPT/本地模型"]
+    A3 --> A4["4. 解析JSON<br/>locator_type/value/confidence"]
+    A4 --> Decision{confidence<br/>≥ 0.85?}
 
-    class Start,Return,Error startEnd
-    class Check,Result,A5,A9 decision
-    class TryLocate,A1,A2,A3,A4,A8 process
-    class Cache,A6,A7 cache
-    class A10,A11 error
-    class AI_FLOW aiBox
+    Decision -->|"✓ 是 高置信度"| A5["5a. 缓存新定位器<br/>写入elements.yaml"]
+    Decision -->|"✗ 否 低置信度"| A6["5b. 记录healing_log<br/>标记待人工审核"]
 
-    %% 连接线样式
-    linkStyle 0 stroke-width:2px,stroke:#333
-    linkStyle 1 stroke-width:2px,stroke:#00a86b
-    linkStyle 2 stroke-width:2px,stroke:#00a86b
-    linkStyle 3 stroke-width:2px,stroke:#00a86b
-    linkStyle 4 stroke-width:2px,stroke:#ff5252,stroke-dasharray:5,5
-    linkStyle 5 stroke-width:2px,stroke:#9370db
-    linkStyle 6 stroke-width:2px,stroke:#6b6bff
-    linkStyle 7 stroke-width:2px,stroke:#6b6bff
-    linkStyle 8 stroke-width:2px,stroke:#6b6bff
-    linkStyle 9 stroke-width:2px,stroke:#6b6bff
-    linkStyle 10 stroke-width:2px,stroke:#6b6bff
-    linkStyle 11 stroke-width:2px,stroke:#00a86b
-    linkStyle 12 stroke-width:2px,stroke:#ff8c00
-    linkStyle 13 stroke-width:2px,stroke:#00a86b
-    linkStyle 14 stroke-width:2px,stroke:#00a86b
-    linkStyle 15 stroke-width:2px,stroke:#ff5252
-    linkStyle 16 stroke-width:2px,stroke:#ff5252
-    linkStyle 17 stroke-width:2px,stroke:#ff5252
-    linkStyle 18 stroke-width:2px,stroke:#ff5252
+    A5 --> Retry["使用新定位器<br/>重试find_element()"]
+    A6 --> Retry
+    A5 -.->|"写持久化"| Repo["元素仓库<br/>elements.yaml"]
+    A6 -.->|"仅记录"| Log["healing_log.jsonl<br/>待审阅"]
+
+    Retry --> RetryOK{重试<br/>成功?}
+    RetryOK -->|"✓"| Return(["返回元素 ✓"])
+    RetryOK -->|"✗"| Error(["抛出异常<br/>ElementNotFoundError"])
+
+    style Start fill:#00d4ff,stroke:#006688,color:#000
+    style Cache fill:#80e27e,stroke:#006633,color:#000
+    style Return fill:#80e27e,stroke:#006633,color:#000
+    style Error fill:#ff6b6b,stroke:#880000,color:#fff
+    style Check fill:#ffce5c,stroke:#996600,color:#000
+    style Result fill:#ffce5c,stroke:#996600,color:#000
+    style Decision fill:#ffce5c,stroke:#996600,color:#000
+    style RetryOK fill:#ffce5c,stroke:#996600,color:#000
+    style Try fill:#e8e8e8,stroke:#666666,color:#000
+    style AIStart fill:#f0e8ff,stroke:#9966ff,color:#000
+    style A1 fill:#f0e8ff,stroke:#9966ff,color:#000
+    style A2 fill:#f0e8ff,stroke:#9966ff,color:#000
+    style A3 fill:#f0e8ff,stroke:#9966ff,color:#000
+    style A4 fill:#f0e8ff,stroke:#9966ff,color:#000
+    style A5 fill:#d7ffb8,stroke:#66aa33,color:#000
+    style A6 fill:#ffd7a8,stroke:#aa6633,color:#000
+    style Repo fill:#b8e8ff,stroke:#3399aa,color:#000
+    style Log fill:#ffd7a8,stroke:#aa6633,color:#000
 ```
