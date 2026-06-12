@@ -1,5 +1,7 @@
 # AI 驱动 Selenium 自动化测试：来自一线实践的最佳实践
 
+![Cover](canvas/neural_mechanics_cover.png)
+
 用 AI 大模型来做 Web 自动化测试这件事，我已经跑了将近两年。从最开始的概念验证，到后来真刀真枪地用到生产项目里，踩过的坑比走过的路还多。
 
 这篇文章不打算复述什么"AI 将改变测试行业"这种正确的废话。我只想把在这套框架开发和落地过程中真正管用的经验整理出来，供大家参考。
@@ -23,6 +25,8 @@ AI 的出现给这个问题提供了一个新思路：当定位失败时，让�
 ---
 
 ## 最佳实践一：Page Object 模式不要丢，AI 是补充不是替代
+
+![Page Object + AI](canvas/page_object_ai_concept.png)
 
 有些人以为上了 AI 就可以不写 Page Object 了，这是误区。
 
@@ -92,6 +96,8 @@ AI 定位的核心在于"语义描述"。描述越准确，模型返回的结果
 ---
 
 ## 最佳实践三：自愈阈值要合理设置，不要盲目追求自动化
+
+![Self-Healing](canvas/self_healing_concept.png)
 
 自愈引擎的 `auto_approve_threshold` 默认是 0.85。这个数字不是拍脑袋的，是经过一段时间调试后的经验值。
 
