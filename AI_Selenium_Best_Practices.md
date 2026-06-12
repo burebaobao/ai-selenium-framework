@@ -14,13 +14,11 @@ Selenium 大家都在用，痛点也都知道——元素定位器太脆了。�
 
 AI 的出现给这个问题提供了一个新思路：当定位失败时，让模型去"理解"页面结构，自己推断出新的定位方式。这不是要替代 Page Object，而是给 Page Object 加一层弹性。
 
-我在这套框架里实现的核心能力有三个：
+框架核心能力有三个：
 
-**AI 元素定位**：传统方式找不到时，用 LLM 分析 HTML，返回语义化的定位建议。
-
-**自愈引擎**：定位器断掉后自动尝试修复，高置信度时自动采纳，低置信度时标记待审核。
-
-**自然语言生成**：说一句话描述操作，框架自动生成可执行的测试代码。
+- **AI 元素定位**：传统方式找不到时，用 LLM 分析 HTML，返回语义化的定位建议。
+- **自愈引擎**：定位器断掉后自动尝试修复，高置信度时自动采纳，低置信度时标记待审核。
+- **自然语言生成**：说一句话描述操作，框架自动生成可执行的测试代码。
 
 ---
 
@@ -125,22 +123,19 @@ AI 返回的定位器在使用前一定要验证有效性。我见过有人直�
 
 框架内置的验证逻辑是：
 
-```python
-result = await ai_locator.locate(page_source, element_desc, url)
-
-if result.found:
-    # 在页面上实际验证
-    if verify_locator(driver, result.locator_type, result.locator_value):
-        # 验证通过才使用
-        element = driver.find_element(by, value)
-    else:
-        # 验证失败，尝试 fallback 策略
-        for fallback in result.fallback_strategies:
-            if verify_locator(driver, fallback['type'], fallback['value']):
-                # ...
+```mermaid
+flowchart TD
+    A["AI 返回定位结果"] --> B{"验证定位器有效性"}
+    B -->|"通过"| C["使用该定位器"]
+    B -->|"失败"| D["尝试 fallback 策略"]
+    D --> E{"fallback<br/>验证通过?"}
+    E -->|"是"| F["使用 fallback"]
+    E -->|"否"| G["抛出异常"]
+    C --> H["执行操作"]
+    F --> H
 ```
 
-这条原则同样适用于 AI 生成的测试代码。生成后先跑一遍，观察有没有误判的元素，有的话就手动修正一下定位器，让 AI 记住这个pattern。
+这条原则同样适用于 AI 生成的测试代码。生成后先跑一遍，观察有没有误判的元素，有的话就手动修正一下定位器，让 AI 记住这个 pattern。
 
 ---
 
@@ -173,6 +168,14 @@ ai_locator._cache.clear()
 
 自然语言生成功能很酷，一句"打开百度，搜索AI测试"就能自动生成一套测试代码。但我跑了这么久下来，感觉它最适合的场景是：
 
+```mermaid
+flowchart LR
+    A["自然语言测试"] --> B["探索性测试<br/>快速验证流程"]
+    A --> C["页面发现<br/>排查定位问题"]
+    A --> D["原型开发<br/>生成初版测试"]
+    A -->|"不适合"| E["长期维护的核心用例"]
+```
+
 **探索性测试**：快速验证某个流程能不能跑通，不需要长期维护。
 
 **页面发现**：给一个 URL，让 AI 分析页面结构，排查定位问题。
@@ -189,21 +192,18 @@ ai_locator._cache.clear()
 
 验证码是登录类测试的老大难问题。我的处理思路是降级策略：
 
-```python
-def solve_captcha(self, captcha_base64: str) -> str | None:
-    # 1. 环境变量直传（CI 环境最常用）
-    if os.environ.get("CAPTCHA_TEXT"):
-        return os.environ["CAPTCHA_TEXT"]
-
-    # 2. Tesseract OCR 自动识别
-    text = self._tesseractRecognize(captcha_base64)
-    if text and len(text) == 4:
-        return text
-
-    # 3. 识别失败，保存图片让人去看
-    self._save_captcha_image(captcha_base64)
-    print("请人工查看验证码并设置环境变量 CAPTCHA_TEXT")
-    return None
+```mermaid
+flowchart TD
+    Start["识别验证码"] --> CheckENV{"CAPTCHA_TEXT<br/>环境变量?"}
+    CheckENV -->|"存在"| UseENV["使用环境变量值<br/>CI 环境最常用"]
+    CheckENV -->|"不存在"| OCR["Tesseract OCR<br/>自动识别"]
+    OCR --> OCRResult{"识别成功?"}
+    OCRResult -->|"是"| Return["返回验证码文字"]
+    OCRResult -->|"否"| Save["保存图片让人去看"]
+    Save --> Manual["提示人工查看输入"]
+    UseENV --> End["返回验证码文字"]
+    Return --> End
+    Manual --> End
 ```
 
 CI 环境里一般通过外部系统预先注入验证码，直接用环境变量传进来就行。手动测试时如果 OCR 识别率低，就让程序把图片保存下来，人看一眼再继续。
@@ -223,6 +223,17 @@ log_path.parent.mkdir(parents=True, exist_ok=True)
 ```
 
 另外一个隔离点是 AI 请求本身。并发太高会导致 API 限流，建议用信号量控制同时进行的 AI 请求数量：
+
+```mermaid
+flowchart LR
+    A["并发请求"] --> S["Semaphore(3)<br/>最多同时 3 个"]
+    S --> B1["请求 1"]
+    S --> B2["请求 2"]
+    S --> B3["请求 3"]
+    B1 -->|"完成"| S
+    B2 -->|"完成"| S
+    B3 -->|"完成"| S
+```
 
 ```python
 import asyncio

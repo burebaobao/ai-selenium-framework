@@ -8,65 +8,86 @@
 
 ## 技术架构
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      测试用例层 (tests/)                     │
-│         pytest + Page Object + 自定义 markers                │
-├─────────────────────────────────────────────────────────────┤
-│                     页面对象层 (pages/)                       │
-│           BasePage + AIElement 智能元素包装                   │
-├─────────────────────────────────────────────────────────────┤
-│                      核心引擎层 (core/)                      │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
-│  │AI Locator│  │Heal Engine│  │Generator │  │Captcha   │  │
-│  │ AI 元素   │  │ 自愈引擎  │  │测试生成器 │  │Solver    │  │
-│  │ 定位器   │  │          │  │          │  │验证码    │  │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘  │
-├─────────────────────────────────────────────────────────────┤
-│                      AI 服务层 (utils/)                      │
-│                  LLMClient (Claude/OpenAI/Local)             │
-├─────────────────────────────────────────────────────────────┤
-│                     Selenium WebDriver                       │
-│              Chrome / Firefox / Edge 多浏览器支持             │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Tests["测试用例层 (tests/)"]
+        T["pytest + Page Object + 自定义 markers"]
+    end
+
+    subgraph Pages["页面对象层 (pages/)"]
+        B["BasePage + AIElement 智能元素包装"]
+    end
+
+    subgraph Core["核心引擎层 (core/)"]
+        AL["AIElementLocator<br/>AI 元素定位器"]
+        HE["HealEngine<br/>自愈引擎"]
+        GEN["AITestGenerator<br/>测试生成器"]
+        CS["CaptchaSolver<br/>验证码识别器"]
+    end
+
+    subgraph Utils["AI 服务层 (utils/)"]
+        LLM["LLMClient<br/>Claude / OpenAI / Local"]
+    end
+
+    subgraph Selenium["Selenium WebDriver"]
+        WD["Chrome / Firefox / Edge"]
+    end
+
+    T --> B
+    B --> AL
+    B --> HE
+    T --> GEN
+    GEN --> AL
+    AL --> LLM
+    HE --> AL
+    LLM --> WD
 ```
 
 ---
 
 ## 目录结构
 
-```
-ai-selenium-framework/
-├── core/                          # 核心引擎
-│   ├── ai_locator.py              # AI 元素定位器
-│   ├── heal_engine.py             # 自愈引擎
-│   ├── driver_factory.py          # 浏览器驱动工厂
-│   ├── ai_generator.py            # 自然语言测试生成器
-│   └── captcha_solver.py          # 验证码识别器
-├── pages/                         # Page Object 页面对象
-│   ├── base_page.py               # AI 增强基类 + AIElement
-│   ├── login_page.py              # 登录页对象 (Demo)
-│   └── ai_generated/              # AI 自动生成的页面对象
-├── tests/                         # 测试用例
-│   ├── conftest.py                # pytest 全局配置 + fixtures
-│   ├── test_login.py              # 登录测试 (Demo)
-│   └── ai_generated/             # AI 生成的测试用例
-├── utils/                         # 工具类
-│   ├── ai_client.py              # LLM 客户端封装
-│   └── logger.py                 # 日志配置
-├── config/                        # 配置
-│   ├── settings.py               # Pydantic 配置管理
-│   └── config.yaml               # 全局配置
-├── element_repository/           # 自愈元素仓库
-│   ├── elements.yaml             # 元素定位器持久化
-│   └── healing_log.jsonl        # 自愈操作日志
-├── scripts/
-│   └── run_nl_test.py            # 自然语言测试入口
-├── reports/                       # 测试报告
-│   ├── screenshots/              # 失败截图
-│   ├── captcha/                  # 验证码图片
-│   └── allure-results/           # Allure 数据
-└── requirements.txt              # 依赖清单
+```mermaid
+graph TD
+    root["ai-selenium-framework/"]
+    root --> core["core/"]
+    root --> pages["pages/"]
+    root --> tests["tests/"]
+    root --> utils["utils/"]
+    root --> config["config/"]
+    root --> elemRepo["element_repository/"]
+    root --> scripts["scripts/"]
+    root --> reports["reports/"]
+    root --> req["requirements.txt"]
+
+    core --> ai_loc["ai_locator.py"]
+    core --> heal["heal_engine.py"]
+    core --> driver_f["driver_factory.py"]
+    core --> ai_gen["ai_generator.py"]
+    core --> captcha["captcha_solver.py"]
+
+    pages --> base["base_page.py"]
+    pages --> login["login_page.py"]
+    pages --> ai_gen_pages["ai_generated/"]
+
+    tests --> conftest["conftest.py"]
+    tests --> test_login["test_login.py"]
+    tests --> ai_gen_tests["ai_generated/"]
+
+    utils --> ai_client["ai_client.py"]
+    utils --> logger["logger.py"]
+
+    config --> settings["settings.py"]
+    config --> config_yaml["config.yaml"]
+
+    elemRepo --> elements_yaml["elements.yaml"]
+    elemRepo --> healing_log["healing_log.jsonl"]
+
+    scripts --> run_nl["run_nl_test.py"]
+
+    reports --> screenshots["screenshots/"]
+    reports --> captcha_rep["captcha/"]
+    reports --> allure["allure-results/"]
 ```
 
 ---
@@ -78,12 +99,15 @@ ai-selenium-framework/
 **职责**：当传统 `find_element` 失败时，用 LLM 分析页面 HTML，返回最佳定位策略。
 
 **定位流程**：
-1. 接收页面 HTML 和元素语义描述
-2. 清洗 HTML（移除 script/style，保留关键属性）
-3. 构建 prompt 发送给 LLM
-4. 解析 LLM 返回的 JSON（包含 locator_type、locator_value、confidence）
-5. 验证定位器是否有效
-6. 返回 `LocatorResult`
+
+```mermaid
+flowchart LR
+    A["1. 接收 HTML + 语义描述"] --> B["2. 清洗 HTML"]
+    B --> C["3. 构建 Prompt 发给 LLM"]
+    C --> D["4. 解析 JSON 结果"]
+    D --> E["5. 验证定位器有效性"]
+    E --> F["6. 返回 LocatorResult"]
+```
 
 **关键类**：
 
@@ -117,17 +141,19 @@ class AIElementLocator:
 **职责**：自愈引擎，当定位器断掉时自动修复。
 
 **工作流程**：
-```
-定位失败 (NoSuchElementException)
-         ↓
-AI 分析当前页面 HTML
-         ↓
-生成新定位策略
-         ↓
-验证新定位器有效性
-         ↓
-├─ 置信度 ≥ 0.85 → 自动更新 elements.yaml
-└─ 置信度 < 0.85 → 标记待人工审核
+
+```mermaid
+flowchart TD
+    Start["定位失败<br/>NoSuchElementException"] --> AI["AI 分析当前页面 HTML"]
+    AI --> Generate["生成新定位策略"]
+    Generate --> Verify["验证新定位器有效性"]
+    Verify --> Decision{"置信度 ≥ 0.85 ?"}
+    Decision --"是" --> AutoUpdate["自动更新 elements.yaml"]
+    Decision --"否" --> ManualReview["标记待人工审核"]
+    AutoUpdate --> Return["返回新定位值"]
+    ManualReview --> Return
+    Verify --> Fail{"验证失败?"} -->|"是"| None["返回 None"]
+    None --> End["抛出原异常"]
 ```
 
 **核心方法**：
@@ -154,19 +180,18 @@ class HealEngine:
 **职责**：智能元素包装器，封装定位逻辑和操作方法。
 
 **核心逻辑**：
-```python
-class AIElement:
-    @property
-    def element(self) -> WebElement:
-        # 优先级1: 传统定位 (locator 参数)
-        # 失败 → 优先级2: AI 语义定位
-        # 成功 → 缓存结果
 
-    # 操作代理
-    def click() -> AIElement
-    def input(text) -> AIElement
-    def get_text() -> str
-    def get_attribute(name) -> str
+```mermaid
+flowchart TD
+    Start["调用 element()"] --> Check{"有 locator 参数<br/>且未愈合过?"}
+    Check -->|"是"| Try["尝试传统定位"]
+    Try --> Success["返回 WebElement"]
+    Try --> Fail["捕获异常"]
+    Check -->|"否" | AI["调用 AI 语义定位"]
+    Fail --> AI
+    AI --> AIResult{"AI 定位成功?"}
+    AIResult -->|"是"| Return["返回 WebElement<br/>标记 healed=True"]
+    AIResult -->|"否"| Error["抛出 ElementNotFoundError"]
 ```
 
 **用法示例**：
@@ -209,6 +234,22 @@ class BasePage:
 
 **职责**：统一封装 Claude / OpenAI / Local (Ollama) 三种 LLM 调用方式。
 
+```mermaid
+flowchart TD
+    Ask["ask(prompt)"] --> Provider{"provider ?"}
+    Provider -->|"claude"| Claude["_ask_claude()<br/>Anthropic API"]
+    Provider -->|"openai"| OpenAI["_ask_openai()<br/>OpenAI API"]
+    Provider -->|"local"| Local["_ask_local()<br/>Ollama 等本地模型"]
+    Claude --> Resp["返回响应文本"]
+    OpenAI --> Resp
+    Local --> Resp
+    Claude -.->|API Key 不存在| Mock["_mock_response()<br/>模拟响应"]
+    OpenAI -.-> Mock
+    Local -.-> Mock
+```
+
+**关键方法**：
+
 ```python
 class LLMClient:
     async def ask(prompt, response_model=None) -> str
@@ -229,11 +270,17 @@ class LLMClient:
 **职责**：将自然语言描述转换为可执行的 pytest 测试代码。
 
 **生成流程**：
-1. 解析自然语言 → 结构化步骤列表 `TestStep[]`
-2. 提取 Page Object 名称
-3. 生成 Page Object 代码
-4. 生成测试代码
-5. 写入 `pages/ai_generated/` 和 `tests/ai_generated/`
+
+```mermaid
+flowchart LR
+    A["自然语言描述"] --> B["1. 解析为 TestStep[]"]
+    B --> C["2. 提取 Page Object 名称"]
+    C --> D["3. 生成 Page Object 代码"]
+    D --> E["4. 生成测试代码"]
+    E --> F["5. 写入文件"]
+    F --> G["pages/ai_generated/*.py"]
+    F --> H["tests/ai_generated/*.py"]
+```
 
 **关键数据结构**：
 
@@ -260,17 +307,19 @@ class GeneratedTest:
 
 **职责**：创建 WebDriver 实例，支持多浏览器和远程模式。
 
-```python
-class DriverFactory:
-    @staticmethod
-    def create_driver(
-        browser="chrome",
-        headless=False,
-        implicit_wait=5,
-        remote_url=None,  # Selenium Grid URL
-        window_width=1920,
-        window_height=1080,
-    ) -> WebDriver
+```mermaid
+flowchart TD
+    Create["create_driver()"] --> Mode{"remote_url ?"}
+    Mode -->|"是"| Remote["_create_remote_driver()<br/>Selenium Grid"]
+    Mode -->|"否"| Local["_create_local_driver()"]
+    Local --> Browser{"browser ?"}
+    Browser -->|"chrome"| Chrome["_create_chrome_driver()"]
+    Browser -->|"firefox"| Firefox["_create_firefox_driver()"]
+    Browser -->|"edge"| Edge["_create_edge_driver()"]
+    Chrome --> Return["返回 WebDriver"]
+    Firefox --> Return
+    Edge --> Return
+    Remote --> Return
 ```
 
 **支持的浏览器**：
@@ -285,35 +334,61 @@ class DriverFactory:
 **职责**：验证码自动识别。
 
 **识别策略**：
-```
-环境变量 CAPTCHA_TEXT  →  直接使用
-        ↓ 未设置
-Tesseract OCR 识别     →  自动尝试
-        ↓ 失败
-人工查看并输入         →  保存图片提示
+
+```mermaid
+flowchart TD
+    Start["识别验证码"] --> CheckENV{"CAPTCHA_TEXT<br/>环境变量?"}
+    CheckENV -->|"存在"| UseENV["使用环境变量值"]
+    CheckENV -->|"不存在"| OCR["Tesseract OCR 识别"]
+    OCR --> OCRResult{"识别成功?"}
+    OCRResult -->|"是"| ReturnOCR["返回识别结果"]
+    OCRResult -->|"否"| Save["保存图片到 captcha/"]
+    Save --> Manual["提示人工查看输入"]
+    UseENV --> End["返回验证码文字"]
+    ReturnOCR --> End
+    Manual --> End
 ```
 
 ---
 
 ## 依赖关系
 
-```
-requirements.txt
-├── pytest>=8.0                # 测试框架
-├── selenium>=4.20             # Web 自动化
-├── webdriver-manager>=4.0     # 驱动管理
-├── pytest-xdist>=3.6          # 并行执行
-├── pytest-rerunfailures>=14.0 # 失败重试
-├── allure-pytest>=2.13        # 报告
-├── PyYAML>=6.0                # 配置解析
-├── pydantic>=2.0              # 数据验证
-├── httpx>=0.27                # HTTP 客户端
-├── openai>=1.0                # OpenAI API
-├── anthropic>=0.30            # Anthropic API
-├── python-dotenv>=1.0         # 环境变量
-├── loguru>=0.7                # 日志
-├── Pillow>=10.0               # 图片处理
-└── colorama>=0.4              # 彩色终端
+```mermaid
+flowchart LR
+    subgraph Test["测试层"]
+        pytest["pytest>=8.0"]
+        allure["allure-pytest>=2.13"]
+        pytest_xdist["pytest-xdist>=3.6"]
+        pytest_rerun["pytest-rerunfailures>=14.0"]
+    end
+
+    subgraph WebDriver["Web 驱动层"]
+        selenium["selenium>=4.20"]
+        webdriver_mgr["webdriver-manager>=4.0"]
+    end
+
+    subgraph AI["AI 层"]
+        openai["openai>=1.0"]
+        anthropic["anthropic>=0.30"]
+        httpx["httpx>=0.27"]
+    end
+
+    subgraph Data["数据层"]
+        pydantic["pydantic>=2.0"]
+        pyyaml["PyYAML>=6.0"]
+    end
+
+    subgraph Utils["工具层"]
+        loguru["loguru>=0.7"]
+        dotenv["python-dotenv>=1.0"]
+        pillow["Pillow>=10.0"]
+        colorama["colorama>=0.4"]
+    end
+
+    pytest --> selenium
+    webdriver_mgr --> selenium
+    openai --> httpx
+    anthropic --> httpx
 ```
 
 ---
@@ -432,6 +507,16 @@ def pytest_configure(config):
 ## CI/CD 集成
 
 ### GitHub Actions
+
+```mermaid
+flowchart LR
+    subgraph Workflow["GitHub Actions Workflow"]
+        Trigger["on: push / pull_request"] --> Setup["setup-python@v5<br/>Python 3.11"]
+        Setup --> Install["pip install -r requirements.txt"]
+        Install --> Test["pytest tests/<br/>--headless --browser chrome"]
+    end
+```
+
 ```yaml
 name: UI Tests
 on: [push, pull_request]
