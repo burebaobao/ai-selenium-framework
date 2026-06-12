@@ -1,0 +1,49 @@
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Caller as 调用方
+    participant AIEl as AIElement
+    participant AILoc as AIElementLocator
+    participant LLM as LLM API
+    participant Heal as HealEngine
+
+    Caller->>AIEl: element("登录按钮", locator=(By.ID,"login"))
+
+    rect rgb(20, 40, 60)
+        Note over AIEl: 优先级1: 传统定位
+
+        AIEl->>AIEl: 尝试 find_element(ID="login")
+        alt 定位成功
+            AIEl-->>Caller: 返回 WebElement
+        else 定位失败
+            AIEl->>AILoc: locate(html, "登录按钮", url)
+            Note over AILoc: 优先级2: AI 语义定位
+
+            rect rgb(30, 25, 55)
+                Note over AILoc,LLM: AI 定位流程
+
+                AILoc->>AILoc: 清洗 HTML
+                AILoc->>LLM: ask(prompt)
+                LLM-->>AILoc: {locator_type, value, confidence}
+
+                alt confidence >= 0.85
+                    AILoc->>AILoc: 缓存定位器
+                    AILoc->>Heal: 更新 elements.yaml
+                    Note over Heal: 自动采纳
+                else confidence < 0.85
+                    AILoc->>Heal: 记录 healing_log.jsonl
+                    Note over Heal: 标记待人工审核
+                end
+            end
+
+            AILoc-->>AIEl: LocatorResult
+            AIEl->>AIEl: 使用新定位器重试
+
+            alt 重试成功
+                AIEl-->>Caller: 返回 WebElement
+            else 重试失败
+                AIEl-->>Caller: ElementNotFoundError
+            end
+        end
+    end
+```
