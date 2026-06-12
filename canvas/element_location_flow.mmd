@@ -1,0 +1,74 @@
+
+```mermaid
+flowchart TD
+    Start([用户请求元素<br/>GetElement()]) --> Check{是否有显式<br/>定位器？<br/><small>CSS/XPath/ID</small>}
+
+    %% 显式定位器路径
+    Check --"有" --> TryLocate[尝试传统定位<br/><small>driver.find_element</small>]
+    TryLocate --> Result{定位成功?}
+    Result --"✓ 是" --> Cache[缓存 WebElement]
+    Cache --> Return([返回元素])
+
+    Result --"✗ 否" --> AIStart[进入 AI 定位流程]
+
+    %% 无显式定位器直接走 AI
+    Check --"否" --> AIStart
+
+    %% AI 定位流程子图
+    subgraph AI_FLOW ["🤖 AI 元素定位流程"]
+        direction TB
+        A1[1. 获取当前页面 HTML<br/><small>移除 script/style<br/>精简属性</small>] --> A2[2. 构建 Prompt<br/><small>元素描述 + 上下文</small>]
+        A2 --> A3[3. 发送给 LLM<br/><small>Claude / GPT / 本地</small>]
+        A3 --> A4[4. 解析返回结果<br/><small>{locator_type, value,<br/>confidence, reasoning}</small>]
+        A4 --> A5{置信度 ≥ 阈值?<br/><small>默认 0.85</small>}
+        A5 --"✓ 是" --> A6[缓存新定位器]
+        A6 --> A7[写入元素仓库<br/><small>elements.yaml</small>]
+        A7 --> A8[使用新定位器重试 find_element]
+        A8 --> A9{重试成功?}
+        A9 --"✓ 是" --> Cache
+
+        A5 --"✗ 否" --> A10[记录到 healing_log<br/><small>标记待人工审核</small>]
+        A10 --> A11[返回 fallback 策略<br/>或抛出 ElementNotFound]
+        A9 --"✗ 否" --> A10
+    end
+
+    AIStart --> A1
+    A11 --> Error([失败<br/>抛出异常])
+
+    %% 样式
+    classDef startEnd fill:#00d4ff,stroke:#000,stroke-width:2px,color:#000,font-weight:bold,rx:10,ry:10
+    classDef decision fill:#ffce5c,stroke:#000,stroke-width:2px,color:#000,rx:8,ry:8
+    classDef process fill:#e8e8e8,stroke:#333,stroke-width:1.5px,color:#000
+    classDef success fill:#80e27e,stroke:#000,stroke-width:2px,color:#000,font-weight:bold
+    classDef error fill:#ff6b6b,stroke:#000,stroke-width:2px,color:#000,font-weight:bold
+    classDef aiBox fill:#f0f0ff,stroke:#6b6bff,stroke-width:2px,color:#000,stroke-dasharray:5,5
+    classDef cache fill:#ffd7a8,stroke:#000,stroke-width:1.5px,color:#000
+
+    class Start,Return,Error startEnd
+    class Check,Result,A5,A9 decision
+    class TryLocate,A1,A2,A3,A4,A8 process
+    class Cache,A6,A7 cache
+    class A10,A11 error
+    class AI_FLOW aiBox
+
+    %% 连接线样式
+    linkStyle 0 stroke-width:2px,stroke:#333
+    linkStyle 1 stroke-width:2px,stroke:#00a86b
+    linkStyle 2 stroke-width:2px,stroke:#00a86b
+    linkStyle 3 stroke-width:2px,stroke:#00a86b
+    linkStyle 4 stroke-width:2px,stroke:#ff5252,stroke-dasharray:5,5
+    linkStyle 5 stroke-width:2px,stroke:#9370db
+    linkStyle 6 stroke-width:2px,stroke:#6b6bff
+    linkStyle 7 stroke-width:2px,stroke:#6b6bff
+    linkStyle 8 stroke-width:2px,stroke:#6b6bff
+    linkStyle 9 stroke-width:2px,stroke:#6b6bff
+    linkStyle 10 stroke-width:2px,stroke:#6b6bff
+    linkStyle 11 stroke-width:2px,stroke:#00a86b
+    linkStyle 12 stroke-width:2px,stroke:#ff8c00
+    linkStyle 13 stroke-width:2px,stroke:#00a86b
+    linkStyle 14 stroke-width:2px,stroke:#00a86b
+    linkStyle 15 stroke-width:2px,stroke:#ff5252
+    linkStyle 16 stroke-width:2px,stroke:#ff5252
+    linkStyle 17 stroke-width:2px,stroke:#ff5252
+    linkStyle 18 stroke-width:2px,stroke:#ff5252
+```
